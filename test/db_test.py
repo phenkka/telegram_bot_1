@@ -1,6 +1,6 @@
 import unittest
 
-from db.database import Database
+from db.db import Database
 
 
 def clean_db(db):
@@ -9,7 +9,7 @@ def clean_db(db):
 
 
 def init_db():
-    db = Database(minconn=1, maxconn=10, dbname='fabu-test', user='fabu', password='01234567')
+    db = Database(minconn=1, maxconn=10, dbname='fabu', user='fabu_admin', password='1547')
     clean_db(db)
     return db
 
