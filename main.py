@@ -11,16 +11,16 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiocryptopay import Networks, AioCryptoPay
 
-from db.database import Database, ImportDB, Transactions
+from db.database import Database, ImportDB
 import app.config as cfg
 import app.keyboards as kb
 
 
 bot = Bot(token=cfg.token)
 dp = Dispatcher(bot=bot, storage=MemoryStorage())
-db = Database("db/database.db")
+db = Database(cfg.user, cfg.password, cfg.host, cfg.dbname)
 info = ImportDB("db/data.db")
-trans = Transactions("db/transaction.db")
+
 client = AioCryptoPay(token=cfg.TOKEN_CRYPTO_BOT, network=Networks.MAIN_NET)
 
 API = cfg.API
@@ -150,12 +150,12 @@ async def toggle_notify(callback_query: CallbackQuery):
 
 async def background_task():
     while True:
-        tokens = trans.get_tokens_with_more_than_5_unique_wallets()
+        tokens = db.get_tokens_with_more_than_5_unique_wallets()
         print(tokens)
         for token in tokens:
-            print(trans.is_token_notified(token))
-            if not trans.is_token_notified(token):
-                wallets = trans.get_unique_wallets_for_token(token)
+            print(db.is_token_notified(token))
+            if not db.is_token_notified(token):
+                wallets = db.get_unique_wallets_for_token(token)
                 print(wallets)
                 message = f"🔔 The token <a href='https://dexscreener.com/solana/{token}'>{token}</a> is being actively bought!\nHere's the list:\n\n"
                 count = 0
@@ -176,7 +176,7 @@ async def background_task():
                     else:
                         continue
 
-                trans.add_notified_token(token)
+                db.add_notified_token(token)
                 if count > 2:
                     await notify_users(message)
                 else:
@@ -258,7 +258,10 @@ async def process_check_end(message: Message, state: FSMContext):
                 list_wallets = ''
                 for user_wallet in user_wallets:
                     wallet_address = user_wallet[0]
-                    pnl, wr = info.get_data(wallet_address)
+                    if info.get_data(wallet_address):
+                        pnl, wr = info.get_data(wallet_address)
+                    else:
+                        pnl, wr = 'N/D', 'N/D'
 
                     if pnl is not None and wr is not None:
                         pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
@@ -289,7 +292,10 @@ async def process_check_end(message: Message, state: FSMContext):
 
             for wallet in wallets:
                 wallet_address = wallet[0]
-                pnl, wr = info.get_data(wallet_address)
+                if info.get_data(wallet_address):
+                    pnl, wr = info.get_data(wallet_address)
+                else:
+                    pnl, wr = 'N/D', 'N/D'
 
                 if pnl is not None and wr is not None:
                     pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
@@ -403,7 +409,7 @@ async def process_add_end(message: Message):
 
 
 async def main():
-    db.create_table()
+    db.create_table('db/migration/v1_tables.sql')
     db.remove_expired_users()
     asyncio.create_task(background_task())
     await dp.start_polling(bot)
