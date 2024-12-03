@@ -1,2 +1,0 @@
-ALTER TABLE sol_wallet
-ADD COLUMN wallet_type ENUM('INFLUENCER', 'SMART', 'WHALE', 'INSIDER');
