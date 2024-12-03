@@ -18,7 +18,7 @@ import app.keyboards as kb
 
 bot = Bot(token=cfg.token)
 dp = Dispatcher(bot=bot, storage=MemoryStorage())
-db = Database(cfg.user, cfg.password, cfg.host, cfg.dbname)
+db = Database(minconn=1, maxconn=10, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
 info = ImportDB("db/data.db")
 
 client = AioCryptoPay(token=cfg.TOKEN_CRYPTO_BOT, network=Networks.MAIN_NET)
@@ -36,9 +36,10 @@ class Form(StatesGroup):
 
 """Блок настройки доступа к боту"""
 # <<<------------------------------------------------------------------------------------------------>>>
+# Функция для проверки статуса платежа
 async def check_payment(user_id: int):
-    payment_status = db.get_payment_status(user_id)
-    return payment_status == "paid"
+    payment_status = db.get_payment_status(user_id)  # Здесь проверяется статус оплаты в базе данных
+    return payment_status == "paid"  # Возвращает True, если оплачено
 
 async def check_user_access(message: Message, database, check_payment_func):
     user_id = message.from_user.id
@@ -140,12 +141,15 @@ async def toggle_notify(callback_query: CallbackQuery):
     new_status = not current_status
     db.update_notify_status(user_id, new_status)
 
+    # Обновляем кнопку
     keyboard = generate_notify_keyboard(new_status)
     await bot.edit_message_reply_markup(
         chat_id=callback_query.message.chat.id,
         message_id=callback_query.message.message_id,
         reply_markup=keyboard
     )
+
+    # Отвечаем на callback
     await callback_query.answer(f"Уведомления {'включены' if new_status else 'выключены'}")
 
 async def background_task():
@@ -168,16 +172,16 @@ async def background_task():
                         infl, link = db.get_influencer(wallet)
                         count += 1
 
+                        # Формируем строку для кошелька
                         message += (
                             f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
                             f"<code>{wallet}</code>\n\n"
-
                         )
                     else:
                         continue
 
                 db.add_notified_token(token)
-                if count > 2:
+                if count > 3:
                     await notify_users(message)
                 else:
                     continue
@@ -189,11 +193,13 @@ async def background_task():
 """Блок популярных токенов"""
 # <<<------------------------------------------------------------------------------------------------>>>
 async def notify_users(message):
-
+    # Получаем список пользователей, которые включили уведомления
     users_with_notifications = db.get_users_with_notifications()
 
+    # Для каждого пользователя в списке отправляем уведомление
     for user_id in users_with_notifications:
         try:
+            # Отправляем уведомление пользователю
             await bot.send_message(user_id, message, parse_mode='HTML', disable_web_page_preview=True)
         except Exception as e:
             print(f"Ошибка при отправке уведомления пользователю {user_id}: {e}")
@@ -203,6 +209,7 @@ async def notify_users(message):
 """Блок проверки кошельков"""
 # <<<------------------------------------------------------------------------------------------------>>>
 async def check(message_or_callback, state: FSMContext):
+    # Формируем основное сообщение для обоих случаев
     if not await check_user_access(message_or_callback, db, check_payment):
         return
 
@@ -258,15 +265,13 @@ async def process_check_end(message: Message, state: FSMContext):
                 list_wallets = ''
                 for user_wallet in user_wallets:
                     wallet_address = user_wallet[0]
-                    if info.get_data(wallet_address):
-                        pnl, wr = info.get_data(wallet_address)
-                    else:
-                        pnl, wr = 'N/D', 'N/D'
+                    pnl, wr = info.get_data(wallet_address)
 
                     if pnl is not None and wr is not None:
                         pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
                         wr_emoji = "🟢" if float(wr.strip('%')) > 50 else "🔴"
 
+                        # Формируем строку для кошелька
                         list_wallets += (
                             f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}\n"
                             f"<code>{wallet_address}</code>\n\n"
@@ -292,15 +297,13 @@ async def process_check_end(message: Message, state: FSMContext):
 
             for wallet in wallets:
                 wallet_address = wallet[0]
-                if info.get_data(wallet_address):
-                    pnl, wr = info.get_data(wallet_address)
-                else:
-                    pnl, wr = 'N/D', 'N/D'
+                pnl, wr = info.get_data(wallet_address)
 
                 if pnl is not None and wr is not None:
                     pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
                     wr_emoji = "🟢" if float(wr.strip('%')) > 50 else "🔴"
 
+                    # Формируем строку для каждого кошелька
                     response += (
                         f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}\n"
                         f"<code>{wallet_address}</code>\n\n"
@@ -395,11 +398,11 @@ async def process_add_end(message: Message):
     data = message.text.split(' ')
     data[1] = data[1].replace('[пробел]', ' ').lower()
 
-    if len(data) > 3:
+    if len(data) > 4:
         await message.reply('См. образец!')
         return
 
-    if not db.add_row(data[0], data[1], data[2]):
+    if not db.add_row(data[0], data[1], data[2], data[3]):
         await message.reply("Ошибка!")
         return
 
@@ -409,7 +412,6 @@ async def process_add_end(message: Message):
 
 
 async def main():
-    db.create_table('db/migration/v1_tables.sql')
     db.remove_expired_users()
     asyncio.create_task(background_task())
     await dp.start_polling(bot)
@@ -421,5 +423,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Exit")
-    finally:
-        db.close()
