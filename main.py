@@ -57,17 +57,22 @@ async def check_payment(user_id: int):
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    gif_path = 'img/perry.gif'
-    gif = FSInputFile(gif_path)
+    fabu_img_path = 'img/fabu.png'
+    fabu_img = FSInputFile(fabu_img_path)
 
     # if not await check_user_access(message, db, check_payment):
     #     return
 
-    await message.answer_animation(animation=gif, caption="🤖 Hello there! 👋"
-                         "\n\nI’m your AI assistant, ready to help you dive into the 💼 depths of influencers’ wallets I’ve learned about. 🕵️‍♂️ Let’s explore what treasures they hold... 💎"
-                         "\n\nBut... 🤔 I don’t know everyone just yet. Over time, I’ll keep expanding my knowledge base! 🚀  "
-                         "\n\n🌟 So, what do you say? Shall we begin?"
-                         f"\n\n<a href='{cfg.ref_tgc}'>Channel</a> | <a href='{cfg.ref_tgchat}'>Chat</a> | <a href='{cfg.ref_sup}'>Support</a>", reply_markup=kb.greeting, parse_mode='HTML')
+    await message.answer_photo(
+        photo=fabu_img,
+        caption="🤖 Hello there! 👋"
+             "\n\nI’m your AI assistant, ready to help you dive into the 💼 depths of influencers’ wallets I’ve learned about. 🕵️‍♂️ Let’s explore what treasures they hold... 💎"
+             "\n\nBut... 🤔 I don’t know everyone just yet. Over time, I’ll keep expanding my knowledge base! 🚀  "
+             "\n\n🌟 So, what do you say? Shall we begin?"
+             f"\n\n<a href='{cfg.ref_tgc}'>Channel</a> | <a href='{cfg.ref_tgchat}'>Chat</a> | <a href='{cfg.ref_sup}'>Support</a>",
+        reply_markup=kb.greeting,
+        parse_mode='HTML'
+    )
 
 @dp.message(Command("pay"))
 async def pay_command(message: Message):
