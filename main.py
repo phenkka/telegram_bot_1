@@ -11,15 +11,16 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiocryptopay import Networks, AioCryptoPay
 
-from db.database import Database, ImportDB
-import app.config as cfg
+from db.database import Database
+from app import config as cfg
 import app.keyboards as kb
+from dex_parse import fetch_token_data
 
 
 bot = Bot(token=cfg.token)
 dp = Dispatcher(bot=bot, storage=MemoryStorage())
-db = Database(minconn=1, maxconn=10, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
-info = ImportDB("db/data.db")
+db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
+
 
 client = AioCryptoPay(token=cfg.TOKEN_CRYPTO_BOT, network=Networks.MAIN_NET)
 
@@ -41,33 +42,40 @@ async def check_payment(user_id: int):
     payment_status = db.get_payment_status(user_id)  # Здесь проверяется статус оплаты в базе данных
     return payment_status == "paid"  # Возвращает True, если оплачено
 
-async def check_user_access(message: Message, database, check_payment_func):
-    user_id = message.from_user.id
-    group_id = cfg.TG_ID
-    chat_member = await bot.get_chat_member(group_id, user_id)
-    if not await check_payment_func(user_id) or not database.is_payment_valid(user_id):
-        await message.answer("Payment 💸 expired or missing ⏳. Please use the /pay command to renew. <b>30-days</b> subscription", parse_mode='HTML')
-        return False
-    if chat_member.status not in ["member", "administrator", "creator"]:
-        await message.answer("⚠️ To use the bot, you need to be a member of our group. Please subscribe:"
-            f" <a href='https://t.me/{group_id[1:]}'>{group_id}</a>", parse_mode='HTML')
-        return
-    return True
+# async def check_user_access(message: Message, database, check_payment_func):
+#     user_id = message.from_user.id
+#     group_id = cfg.TG_ID
+#     chat_member = await bot.get_chat_member(group_id, user_id)
+#     if not await check_payment_func(user_id) or not database.is_payment_valid(user_id):
+#         await message.answer("Payment 💸 expired or missing ⏳. Please use the /pay command to renew. <b>30-days</b> subscription", parse_mode='HTML')
+#         return False
+#     if chat_member.status not in ["member", "administrator", "creator"]:
+#         await message.answer("⚠️ To use the bot, you need to be a member of our group. Please subscribe:"
+#             f" <a href='https://t.me/{group_id[1:]}'>{group_id}</a>", parse_mode='HTML')
+#         return
+#     return True
 
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    gif_path = 'img/perry.gif'
-    gif = FSInputFile(gif_path)
+    user_id = message.from_user.id
+    db.update_payment_status(user_id, "paid")
+    fabu_img_path = 'img/fabu.png'
+    fabu_img = FSInputFile(fabu_img_path)
 
-    if not await check_user_access(message, db, check_payment):
-        return
+    # if not await check_user_access(message, db, check_payment):
+    #     return
 
-    await message.answer_animation(animation=gif, caption="🎩 Welcome! 👋"
-                         "\n\nI’m here to help you uncover 💰 the wallets of influencers I know 🤵 and what’s inside them..."
-                         "\n\nBut... 😢 I don’t know all of them yet. Over time, I’ll gather more knowledge."
-                         "\n\n🌟 Well, shall we start?"
-                         f"\n\n<a href='{cfg.ref_tgc}'>Channel</a> | <a href='{cfg.ref_tgchat}'>Chat</a> | <a href='{cfg.ref_sup}'>Support</a>", reply_markup=kb.greeting, parse_mode='HTML')
+    await message.answer_photo(
+        photo=fabu_img,
+        caption="🤖 Hello there! 👋"
+                "\n\nI’m your AI assistant, ready to help you dive into the 💼 depths of influencers’ wallets I’ve learned about. 🕵️‍♂️ Let’s explore what treasures they hold... 💎"
+                "\n\nBut... 🤔 I don’t know everyone just yet. Over time, I’ll keep expanding my knowledge base! 🚀  "
+                "\n\n🌟 So, what do you say? Shall we begin?"
+                f"\n\n<a href='{cfg.ref_tgc}'>Channel</a> | <a href='{cfg.ref_tgchat}'>Chat</a> | <a href='{cfg.ref_sup}'>Support</a>",
+        reply_markup=kb.greeting,
+        parse_mode='HTML'
+    )
 
 @dp.message(Command("pay"))
 async def pay_command(message: Message):
@@ -100,12 +108,16 @@ async def check_invoice(call: CallbackQuery):
 """Ниже - хендлеры для вызова через команду и просто"""
 
 async def menu(message_or_callback):
-    if not await check_user_access(message_or_callback, db, check_payment):
-        return
+    # if not await check_user_access(message_or_callback, db, check_payment):
+    #     return
+    user_id = message_or_callback.from_user.id
+    db.update_payment_status(user_id, "paid")
+    print(db.get_users_with_notifications())
+    print(f'ВОТ - {db.get_tokens_with_more_than_5_unique_wallets()}')
     if isinstance(message_or_callback, Message):
-        await message_or_callback.answer("🎩 What would you like to do? Your move, agent 🕵️‍♂️ ...", reply_markup=kb.menu)
+        await message_or_callback.answer("🤖 What would you like to explore next? Your turn, thinker 🧠... The choice is yours! ✨", reply_markup=kb.menu)
     elif isinstance(message_or_callback, CallbackQuery):
-        await message_or_callback.message.answer("🎩 What would you like to do? Your move, agent 🕵️‍♂️ ...", reply_markup=kb.menu)
+        await message_or_callback.message.answer("🤖 What would you like to explore next? Your turn, thinker 🧠... The choice is yours! ✨ ", reply_markup=kb.menu)
 
 @dp.callback_query(F.data == "start")
 async def process_menu(callback_query: CallbackQuery):
@@ -119,38 +131,83 @@ async def cmd_menu(message: Message):
 
 """Блок настроек"""
 # <<<------------------------------------------------------------------------------------------------>>>
-def generate_notify_keyboard(status):
-    button_text = "🟢 On" if status else "🔴 Off"
-    button_callback = "toggle_notify"
-    button = InlineKeyboardButton(text=button_text, callback_data=button_callback)
+def generate_notify_keyboard(status1, status2):
+    # button_text = "🟢 On" if status else "🔴 Off"
+    button_text1 = "🟢 Notify influencers" if status1 else "🔴 Notify influencers"
+    button_text2 = "🟢 Notify smarts" if status2 else "🔴 Notify smart"
+
+    # button = InlineKeyboardButton(text=button_text, callback_data="toggle_notify")
+    button1 = InlineKeyboardButton(text=button_text1, callback_data="infl_notify")
+    button2 = InlineKeyboardButton(text=button_text2, callback_data="smart_notify")
     button_menu = InlineKeyboardButton(text="Menu", callback_data='start')
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[button], [button_menu]])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[button1, button2], [button_menu]])
     return keyboard
+
+async def spy(message_or_callback):
+    user_id = message_or_callback.from_user.id
+
+    notify_infl = db.get_notify_infl(user_id)
+    notify_smart = db.get_notify_smart(user_id)
+    keyboard = generate_notify_keyboard(notify_infl, notify_smart)
+
+    message = "🤖 Ah, keeping track of the influencers’ moves, are we? 😏 Just enable this feature, and I’ll notify you whenever I spot a token catching the attention of influencers! 🚀👀 Always here to keep you informed."
+
+    if isinstance(message_or_callback, Message):
+        await message_or_callback.answer(message, reply_markup=keyboard, parse_mode='HTML')
+    elif isinstance(message_or_callback, CallbackQuery):
+        await message_or_callback.message.edit_text(message, reply_markup=keyboard, parse_mode='HTML')
 
 @dp.callback_query(F.data == "spy")
 async def process_spy(callback_query: CallbackQuery):
-    user_id = callback_query.from_user.id
-    notify_status = db.get_notify_status(user_id)
-    keyboard = generate_notify_keyboard(notify_status)
-    await callback_query.message.answer("Oh, decided to keep an eye on the influencers, huh? 😏 Well, just <b>activate this feature</b>, and I'll let you know if any token starts getting <b>actively bought</b> by influencers! 🚀👀", reply_markup=keyboard, parse_mode='HTML')
+    await spy(callback_query)
 
-@dp.callback_query(lambda c: c.data == "toggle_notify")
-async def toggle_notify(callback_query: CallbackQuery):
+@dp.message(Command('spy'))
+async def cmd_spy(message: Message):
+    await spy(message)
+
+@dp.callback_query(lambda c: c.data == "infl_notify")
+async def toggle_notify_infl(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
-    current_status = db.get_notify_status(user_id)
+    current_status = db.get_notify_infl(user_id)
     new_status = not current_status
-    db.update_notify_status(user_id, new_status)
 
-    # Обновляем кнопку
-    keyboard = generate_notify_keyboard(new_status)
+    db.update_notify_infl_status(user_id, new_status)
+
+    notify_infl = db.get_notify_infl(user_id)
+    notify_smart = db.get_notify_smart(user_id)
+
+    status_message = "Influencer notifications " + ("enabled!" if new_status else "disabled!")
+    await callback_query.answer(status_message, show_alert=True)
+
+    keyboard = generate_notify_keyboard(notify_infl, notify_smart)
     await bot.edit_message_reply_markup(
         chat_id=callback_query.message.chat.id,
         message_id=callback_query.message.message_id,
         reply_markup=keyboard
     )
 
-    # Отвечаем на callback
-    await callback_query.answer(f"Уведомления {'включены' if new_status else 'выключены'}")
+@dp.callback_query(lambda c: c.data == "smart_notify")
+async def toggle_notify_smart(callback_query: CallbackQuery):
+    user_id = callback_query.from_user.id
+    current_status = db.get_notify_smart(user_id)
+    new_status = not current_status
+
+    db.update_notify_smart_status(user_id, new_status)
+
+    notify_infl = db.get_notify_infl(user_id)
+    notify_smart = db.get_notify_smart(user_id)
+
+    status_message = "Smart notifications " + ("enabled!" if new_status else "disabled!")
+    await callback_query.answer(status_message, show_alert=True)
+
+    keyboard = generate_notify_keyboard(notify_infl, notify_smart)
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.message.chat.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=keyboard
+    )
+
 
 async def background_task():
     while True:
@@ -158,48 +215,88 @@ async def background_task():
         print(tokens)
         for token in tokens:
             print(db.is_token_notified(token))
+            count, all_count = 0, 0
             if not db.is_token_notified(token):
                 wallets = db.get_unique_wallets_for_token(token)
                 print(wallets)
-                message = f"🔔 The token <a href='https://dexscreener.com/solana/{token}'>{token}</a> is being actively bought!\nHere's the list:\n\n"
-                count = 0
+
+                symbol, market_cap = fetch_token_data(token)
+
+                if len(market_cap) < 7:
+                    market_cap = f"{market_cap[:-3]}K"
+
+                elif 7 <= len(market_cap) < 10:
+                    market_cap = f"{market_cap[:-6]}.{market_cap[-6:-4]}M"
+
+                else:
+                    market_cap = f"{market_cap[:-9]}.{market_cap[-9:-7]}B"
+
+                message = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
+                           f"\nMC: <i>{market_cap}</i> 💲"
+                           f"\nHere's the list:\n\n")
+                message_smart = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
+                           f"\nMC: <i>{market_cap}</i> 💲"
+                           f"\nHere's the list:\n\n")
+                message_infl = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
+                           f"\nMC: <i>{market_cap}</i> 💲"
+                           f"\nHere's the list:\n\n")
+
                 for wallet in wallets:
-                    result = info.get_data(wallet)
+                    result = db.get_data(wallet)
                     if result is not None:
                         pnl, wr = result
                         pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
                         wr_emoji = "🟢" if float(wr.strip('%')) > 50 else "🔴"
                         infl, link = db.get_influencer(wallet)
-                        count += 1
 
-                        # Формируем строку для кошелька
+                        all_count += 1
                         message += (
                             f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
                             f"<code>{wallet}</code>\n\n"
                         )
+
+                        if infl == 'smart_degen':
+                            message_smart += (
+                                f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
+                                f"<code>{wallet}</code>\n\n"
+                            )
+                        else:
+                            count += 1
+                            message_infl += (
+                                f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
+                                f"<code>{wallet}</code>\n\n"
+                            )
                     else:
                         continue
 
                 db.add_notified_token(token)
-                if count > 3:
-                    await notify_users(message)
-                else:
-                    continue
+                print('захожу в нотифай юзерс')
+                await notify_users(message, message_smart, message_infl, count, all_count)
 
         await asyncio.sleep(60)
-# <<<------------------------------------------------------------------------------------------------>>>
 
 
-"""Блок популярных токенов"""
-# <<<------------------------------------------------------------------------------------------------>>>
-async def notify_users(message):
-    # Получаем список пользователей, которые включили уведомления
+async def notify_users(message, message_smart, message_infl, count, all_count):
     users_with_notifications = db.get_users_with_notifications()
+    print(users_with_notifications)
 
-    # Для каждого пользователя в списке отправляем уведомление
     for user_id in users_with_notifications:
         try:
-            # Отправляем уведомление пользователю
+            notify_infl = db.get_notify_infl(user_id)
+            notify_smart = db.get_notify_smart(user_id)
+
+            if notify_infl and notify_smart and all_count > 2:
+                await bot.send_message(user_id, message, parse_mode='HTML', disable_web_page_preview=True)
+                continue
+
+            elif notify_infl and count > 1:
+                await bot.send_message(user_id, message_infl, parse_mode='HTML', disable_web_page_preview=True)
+                continue
+
+            elif notify_smart:
+                await bot.send_message(user_id, message_smart, parse_mode='HTML', disable_web_page_preview=True)
+                continue
+
             await bot.send_message(user_id, message, parse_mode='HTML', disable_web_page_preview=True)
         except Exception as e:
             print(f"Ошибка при отправке уведомления пользователю {user_id}: {e}")
@@ -210,11 +307,13 @@ async def notify_users(message):
 # <<<------------------------------------------------------------------------------------------------>>>
 async def check(message_or_callback, state: FSMContext):
     # Формируем основное сообщение для обоих случаев
-    if not await check_user_access(message_or_callback, db, check_payment):
-        return
+    # if not await check_user_access(message_or_callback, db, check_payment):
+    #     return
 
-    message_text = "Alright, you can enter 💳 <u><b>wallet</b></u> and I’ll let you know if I know whose it is and what its 📃 statistics are.\n" \
-                   "Or, if you prefer, enter 🤵 <u><b>influencer’s name</b></u> and I’ll give you their 💰 wallets and its stats. You’ve got options 🕵️‍♂️ ...\n\n"
+    message_text = "🤖 Alright, here’s how it works:"\
+                   "You can input a 💳 <u><b>wallet</b></u>, and I’ll check if I recognize it and share its 📊 stats.\n" \
+                   "Or, if you’d rather provide an 🤵 <u><b>influencer’s name</b></u>, I’ll show you their 💼 wallets and the data I’ve gathered.\n\n" \
+                   "The choice is yours — let’s dive in! 🚀"
 
     if isinstance(message_or_callback, Message):
         await message_or_callback.answer(message_text, parse_mode='HTML', reply_markup=kb.tips)
@@ -227,12 +326,20 @@ async def check(message_or_callback, state: FSMContext):
 @dp.callback_query(F.data == "tip")
 async def process_tip(callback_query: CallbackQuery, state: FSMContext):
     message_text = "That's who I know about... Looks around cautiously You know, top secret stuff 🤐: "
+
     influencers = db.get_influencers()
-    if influencers:
-        influencer_list = ", ".join([f"{influencer}" for influencer in influencers])
+    excluded_names = {"smart_degen", "fabu"}
+    filtered_influencers = [influencer for influencer in influencers if influencer not in excluded_names]
+
+    if filtered_influencers:
+        influencer_list = ", ".join(filtered_influencers)
         message_text += influencer_list
+    else:
+        message_text += "No one to share this time!"
+
     await state.set_state(Form.check_sol_wallet)
     await callback_query.message.answer(message_text, parse_mode='HTML')
+
 
 @dp.callback_query(F.data == "check_sol")
 async def process_check_start(callback_query: CallbackQuery, state: FSMContext):
@@ -252,20 +359,30 @@ async def process_check_end(message: Message, state: FSMContext):
         await cmd_holders(message, state)
         return
 
+    if query == 'smart_degen':
+        return
+
     if re.match(SOLANA_ADDRESS_REGEX, message.text):
         result = db.check_row(query)
 
         if result:
-            user_wallets, count_wallets = db.count_wallets(result['user'])
+            if len(result) == 2:  # Проверяем, что результат состоит из 2 элементов
+                user, link = result  # Извлекаем значения из кортежа
+            else:
+                await message.reply("Sorry, no valid data found for this wallet.")
+                return
+            count_wallets = db.count_wallets(user)
+
 
             await message.reply(f"Yes, I know the owner of this wallet 😏. "
-                                f"This is 🤵 <b><a href='{result['link']}'>{result['user']}</a></b>. 🕵️‍ Don't tell anyone! ️",
+                                f"This is 🤵 <b><a href='{link}'>{user}</a></b>. 🕵️‍ Don't tell anyone! ️",
                                 parse_mode='HTML', disable_web_page_preview=True)
             if count_wallets > 1:
+                user_wallets = db.get_user_wallets(user)
                 list_wallets = ''
                 for user_wallet in user_wallets:
                     wallet_address = user_wallet[0]
-                    pnl, wr = info.get_data(wallet_address)
+                    pnl, wr = db.get_data(wallet_address)
 
                     if pnl is not None and wr is not None:
                         pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
@@ -280,12 +397,12 @@ async def process_check_end(message: Message, state: FSMContext):
                         list_wallets += f"<code>{wallet_address}</code>\nNo data available for PNL/WR.\n\n"
 
                 await message.answer(
-                    f"🤵 <b><a href='{result['link']}'>{result['user']}</a></b> has 💰 <b>{count_wallets}</b> wallet(s):\n\n{list_wallets.strip()}",
+                    f"🤵 <b><a href='{link}'>{user}</a></b> has 💰 <b>{count_wallets}</b> wallet(s):\n\n{list_wallets.strip()}",
                     reply_markup=kb.return_menu, parse_mode='HTML', disable_web_page_preview=True
                 )
 
             else:
-                await message.answer(f"This is the only wallet of 🤵 <b>{result['user']}</b>.", reply_markup=kb.return_menu,
+                await message.answer(f"This is the only wallet of 🤵 <b>{user}</b>.", reply_markup=kb.return_menu,
                                      parse_mode='HTML')
 
         else:
@@ -297,7 +414,7 @@ async def process_check_end(message: Message, state: FSMContext):
 
             for wallet in wallets:
                 wallet_address = wallet[0]
-                pnl, wr = info.get_data(wallet_address)
+                pnl, wr = db.get_data(wallet_address)
 
                 if pnl is not None and wr is not None:
                     pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
@@ -321,12 +438,12 @@ async def process_check_end(message: Message, state: FSMContext):
 
 # <<<------------------------------------------------------------------------------------------------>>>
 async def holders(message_or_callback, state: FSMContext):
-    if not await check_user_access(message_or_callback, db, check_payment):
-        return
+    # if not await check_user_access(message_or_callback, db, check_payment):
+    #     return
     if isinstance(message_or_callback, Message):
-        await message_or_callback.answer("So, here you can ✍ enter the <u><b>token address</b></u> and 🔍 find out who owns it... but remember, secret agent stuff, shhh!", parse_mode='HTML')
+        await message_or_callback.answer("🤖 Here, you can ✍️ enter a <u><b>token address</b></u>, and I’ll 🔍 help you figure out who is holding it, along with any details I’ve gathered. Let’s keep it simple and efficient — ready when you are! 🚀", parse_mode='HTML')
     elif isinstance(message_or_callback, CallbackQuery):
-        await message_or_callback.message.answer("So, here you can ✍ enter the <u><b>token address</b></u> and 🔍 find out who owns it... but remember, secret agent stuff, shhh!", parse_mode='HTML')
+        await message_or_callback.message.answer("🤖 Here, you can ✍️ enter a <u><b>token address</b></u>, and I’ll 🔍 help you figure out who is holding it, along with any details I’ve gathered. Let’s keep it simple and efficient — ready when you are! 🚀", parse_mode='HTML')
     await state.set_state(Form.check_sol_holders)
 
 @dp.callback_query(F.data == "holders")
@@ -355,9 +472,9 @@ async def process_holders_end(message: Message, state: FSMContext):
             response = f"Here are the 🤵 influencers who own 💵 <b>{token_name}</b>:\n<code>{token_address}</code>:\n\n"
             for wallet, total_in_sol in wallets:
                 wallet_info = db.check_row(wallet)
-                if wallet_info:
-                    user = wallet_info['user']
-                    link = wallet_info['link']
+                if isinstance(wallet_info, dict):  # Проверяем, что вернулся словарь
+                    user = wallet_info.get('user', 'Unknown User')  # Используем безопасное извлечение
+                    link = wallet_info.get('link', '#')  # Ссылка по умолчанию
                     response += f"Here 💰 <code>{wallet}</code> holds the token, which is owned by 👨 <b><a href='{link}'>{user}</a></b>, and it has tokens worth 💲 <b>{total_in_sol} SOL</b>\n\n"
                 else:
                     response += f"So {wallet}, Balance: {total_in_sol} SOL. Owner information not found.\n\n"
