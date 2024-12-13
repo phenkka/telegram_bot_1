@@ -19,7 +19,7 @@ from dex_parse import fetch_token_data
 
 bot = Bot(token=cfg.token)
 dp = Dispatcher(bot=bot, storage=MemoryStorage())
-db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
+db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password, host=cfg.host)
 
 
 client = AioCryptoPay(token=cfg.TOKEN_CRYPTO_BOT, network=Networks.MAIN_NET)
