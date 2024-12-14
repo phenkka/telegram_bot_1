@@ -19,7 +19,7 @@ from dex_parse import fetch_token_data
 
 bot = Bot(token=cfg.token)
 dp = Dispatcher(bot=bot, storage=MemoryStorage())
-db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password, host=cfg.host)
+db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
 
 
 client = AioCryptoPay(token=cfg.TOKEN_CRYPTO_BOT, network=Networks.MAIN_NET)
@@ -214,13 +214,15 @@ async def background_task():
         tokens = db.get_tokens_with_more_than_5_unique_wallets()
         print(tokens)
         for token in tokens:
-            print(db.is_token_notified(token))
-            count, all_count = 0, 0
+            count, all_count, counts = 0, 0, 0
             if not db.is_token_notified(token):
                 wallets = db.get_unique_wallets_for_token(token)
                 print(wallets)
 
-                symbol, market_cap = fetch_token_data(token)
+                try:
+                    symbol, market_cap = fetch_token_data(token)
+                except ValueError as e:
+                    continue
 
                 if len(market_cap) < 7:
                     market_cap = f"{market_cap[:-3]}K"
@@ -256,6 +258,7 @@ async def background_task():
                         )
 
                         if infl == 'smart_degen':
+                            counts += 1
                             message_smart += (
                                 f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
                                 f"<code>{wallet}</code>\n\n"
@@ -271,12 +274,13 @@ async def background_task():
 
                 db.add_notified_token(token)
                 print('захожу в нотифай юзерс')
-                await notify_users(message, message_smart, message_infl, count, all_count)
+                print(all_count, count, counts)
+                await notify_users(message, message_smart, message_infl, count, all_count, counts)
 
         await asyncio.sleep(60)
 
 
-async def notify_users(message, message_smart, message_infl, count, all_count):
+async def notify_users(message, message_smart, message_infl, count, all_count, counts):
     users_with_notifications = db.get_users_with_notifications()
     print(users_with_notifications)
 
@@ -289,15 +293,16 @@ async def notify_users(message, message_smart, message_infl, count, all_count):
                 await bot.send_message(user_id, message, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
-            elif notify_infl and count > 1:
+            elif notify_infl and count > 2:
                 await bot.send_message(user_id, message_infl, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
-            elif notify_smart:
+            elif notify_smart and counts > 0:
                 await bot.send_message(user_id, message_smart, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
-            await bot.send_message(user_id, message, parse_mode='HTML', disable_web_page_preview=True)
+            else:
+                continue
         except Exception as e:
             print(f"Ошибка при отправке уведомления пользователю {user_id}: {e}")
 # <<<------------------------------------------------------------------------------------------------>>>

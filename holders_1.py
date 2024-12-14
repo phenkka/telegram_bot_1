@@ -1,7 +1,7 @@
 import asyncio
 import aiohttp
 from db.database import Database
-import app.config as cfg
+from app import config as cfg
 
 RPC_URL = "https://api.mainnet-beta.solana.com"
 
@@ -111,7 +111,7 @@ async def process_wallet(wallet, db, session):
 
 
 async def main():
-    db = Database(minconn=1, maxconn=10, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
+    db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
 
     async with aiohttp.ClientSession() as session:
         while True:
