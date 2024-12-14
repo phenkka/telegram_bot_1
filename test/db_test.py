@@ -1,6 +1,6 @@
 import unittest
 
-from db.db import Database
+from db.database import Database
 
 
 def clean_db(db):

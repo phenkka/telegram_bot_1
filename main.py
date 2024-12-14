@@ -210,75 +210,116 @@ async def toggle_notify_smart(callback_query: CallbackQuery):
 
 
 async def background_task():
-    while True:
-        tokens = db.get_tokens_with_more_than_5_unique_wallets()
-        print(tokens)
-        for token in tokens:
-            count, all_count, counts = 0, 0, 0
-            if not db.is_token_notified(token):
-                wallets = db.get_unique_wallets_for_token(token)
-                print(wallets)
+    try:
+        while True:
 
+            retry_attempts = 5
+            tokens = None
+            for attempt in range(retry_attempts):
                 try:
-                    symbol, market_cap = fetch_token_data(token)
-                except ValueError as e:
-                    continue
-
-                if len(market_cap) < 7:
-                    market_cap = f"{market_cap[:-3]}K"
-
-                elif 7 <= len(market_cap) < 10:
-                    market_cap = f"{market_cap[:-6]}.{market_cap[-6:-4]}M"
-
-                else:
-                    market_cap = f"{market_cap[:-9]}.{market_cap[-9:-7]}B"
-
-                message = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
-                           f"\nMC: <i>{market_cap}</i> 💲"
-                           f"\nHere's the list:\n\n")
-                message_smart = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
-                           f"\nMC: <i>{market_cap}</i> 💲"
-                           f"\nHere's the list:\n\n")
-                message_infl = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
-                           f"\nMC: <i>{market_cap}</i> 💲"
-                           f"\nHere's the list:\n\n")
-
-                for wallet in wallets:
-                    result = db.get_data(wallet)
-                    if result is not None:
-                        pnl, wr = result
-                        pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
-                        wr_emoji = "🟢" if float(wr.strip('%')) > 50 else "🔴"
-                        infl, link = db.get_influencer(wallet)
-
-                        all_count += 1
-                        message += (
-                            f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
-                            f"<code>{wallet}</code>\n\n"
-                        )
-
-                        if infl == 'smart_degen':
-                            counts += 1
-                            message_smart += (
-                                f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
-                                f"<code>{wallet}</code>\n\n"
-                            )
-                        else:
-                            count += 1
-                            message_infl += (
-                                f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
-                                f"<code>{wallet}</code>\n\n"
-                            )
+                    tokens = db.get_tokens_with_more_than_5_unique_wallets()
+                    if tokens:
+                        break
                     else:
+                        print("Нет токенов, повторяю попытку.")
+                except Exception as e:
+                    print(f"Ошибка при получении токенов, попытка {attempt + 1}: {e}")
+                    if attempt == retry_attempts - 1:
+                        print("Превышено количество попыток для получения токенов.")
+                        raise
+
+            for token in tokens:
+                count, all_count, counts = 0, 0, 0
+
+                if not db.is_token_notified(token):
+
+                    retry_attempts_wallets = 5
+                    wallets = None
+                    for attempt in range(retry_attempts_wallets):
+                        try:
+                            wallets = db.get_unique_wallets_for_token(token)
+                            if wallets:
+                                break
+                            else:
+                                print(f"Нет кошельков для токена {token}, повторяю попытку.")
+                        except Exception as e:
+                            print(f"Ошибка при получении кошельков для токена {token}, попытка {attempt + 1}: {e}")
+                            if attempt == retry_attempts_wallets - 1:
+                                print(f"Превышено количество попыток для получения кошельков для токена {token}.")
+                                raise
+
+                    try:
+                        symbol, market_cap = fetch_token_data(token)
+                    except ValueError as e:
                         continue
 
-                db.add_notified_token(token)
-                print('захожу в нотифай юзерс')
-                print(all_count, count, counts)
-                await notify_users(message, message_smart, message_infl, count, all_count, counts)
+                    if len(market_cap) < 7:
+                        market_cap = f"{market_cap[:-3]}K"
 
+                    elif 7 <= len(market_cap) < 10:
+                        market_cap = f"{market_cap[:-6]}.{market_cap[-6:-4]}M"
+
+                    else:
+                        market_cap = f"{market_cap[:-9]}.{market_cap[-9:-7]}B"
+
+                    message = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
+                               f"\nMC: <i>{market_cap}</i> 💲"
+                               f"\nHere's the list:\n\n")
+                    message_smart = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
+                               f"\nMC: <i>{market_cap}</i> 💲"
+                               f"\nHere's the list:\n\n")
+                    message_infl = (f"🔔 <b>${symbol}</b> <code>{token}</code> is being actively bought!"
+                               f"\nMC: <i>{market_cap}</i> 💲"
+                               f"\nHere's the list:\n\n")
+
+                    for wallet in wallets:
+                        retry_attempts_wallet = 3
+                        for attempt in range(retry_attempts_wallet):
+                            try:
+                                result = db.get_data(wallet)
+                                if result is not None:
+                                    pnl, wr = result
+                                    pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
+                                    wr_emoji = "🟢" if float(wr.strip('%')) > 50 else "🔴"
+                                    infl, link = db.get_influencer(wallet)
+
+                                    all_count += 1
+                                    message += (
+                                        f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
+                                        f"<code>{wallet}</code>\n\n"
+                                    )
+
+                                    if infl == 'smart_degen':
+                                        counts += 1
+                                        message_smart += (
+                                            f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
+                                            f"<code>{wallet}</code>\n\n"
+                                        )
+                                    else:
+                                        count += 1
+                                        message_infl += (
+                                            f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
+                                            f"<code>{wallet}</code>\n\n"
+                                        )
+                                else:
+                                    continue
+                                break
+                            except Exception as e:
+                                print(f"Ошибка при обработке кошелька {wallet}, попытка {attempt + 1}: {e}")
+                                if attempt == retry_attempts_wallet - 1:
+                                    print(f"Превышено количество попыток для кошелька {wallet}.")
+                                    continue
+
+                    db.add_notified_token(token)
+                    print('захожу в нотифай юзерс')
+                    print(all_count, count, counts)
+                    await notify_users(message, message_smart, message_infl, count, all_count, counts)
+
+            await asyncio.sleep(60)
+    except Exception as e:
+        print(f"Общая ошибка в background_task: {e}")
+        print("Произошла ошибка, будет попытка повторить выполнение через 60 секунд.")
         await asyncio.sleep(60)
-
 
 async def notify_users(message, message_smart, message_infl, count, all_count, counts):
     users_with_notifications = db.get_users_with_notifications()
@@ -297,7 +338,7 @@ async def notify_users(message, message_smart, message_infl, count, all_count, c
                 await bot.send_message(user_id, message_infl, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
-            elif notify_smart and counts > 0:
+            elif notify_smart and counts > 1:
                 await bot.send_message(user_id, message_smart, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
