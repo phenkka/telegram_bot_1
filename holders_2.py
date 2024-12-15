@@ -1,7 +1,7 @@
 import requests
 import time
 from db.database import Database
-import app.config as cfg
+from app import config as cfg
 
 # Адрес RPC для получения токенов на кошельке
 RPC_URL = "https://api.mainnet-beta.solana.com"
@@ -108,7 +108,7 @@ def process_wallets(db):
 
 
 def main():
-    db = Database(minconn=1, maxconn=10, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
+    db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
     while True:
         process_wallets(db)
 

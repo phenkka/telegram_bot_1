@@ -1,37 +1,40 @@
-# WALLET_ADDRESS = "ABAGcLC6hoapG3xFcBkwaXzmdFzdH7nup2JD1feapump"
+WALLET_ADDRESS = "GBVaZABFUkH81F1cF3HHQkAtsz9gVE4qDaBBvfzGpump"
 
 import requests
+import time
 
-def fetch_token_data(address):
-    try:
-        url = f"https://api.dexscreener.com/latest/dex/tokens/{address}"
-        response = requests.get(url)
+def fetch_token_data(address, max_retries=5, retry_delay=1):
+    for attempt in range(max_retries):
+        try:
+            url = f"https://api.dexscreener.com/latest/dex/tokens/{address}"
+            response = requests.get(url)
 
-        if response.status_code != 200:
-            raise requests.RequestException(f"Ошибка API: {response.status_code} {response.reason}")
-        token_data = response.json()
+            if response.status_code != 200:
+                raise requests.RequestException(f"Ошибка API: {response.status_code} {response.reason}")
 
-        if "pairs" in token_data and token_data["pairs"]:
-            pair = token_data["pairs"][0]
-            base_token = pair.get("baseToken", {})
-            market_cap = pair.get("marketCap", "Не указано")
+            token_data = response.json()
 
-            address = base_token.get("address", "Не указано")
-            symbol = base_token.get("symbol", "Не указано")
+            if "pairs" in token_data and token_data["pairs"]:
+                pair = token_data["pairs"][0]
+                base_token = pair.get("baseToken", {})
+                market_cap = pair.get("marketCap", "Не указано")
 
-            print(address, symbol, str(market_cap))
-            return symbol, str(market_cap)
+                address = base_token.get("address", "Не указано")
+                symbol = base_token.get("symbol", "Не указано")
 
-            # return {
-            #     "name": name,
-            #     "symbol": symbol,
-            #     "address": address,
-            #     "marke_tCap": market_cap
-            # }
-        else:
-            raise ValueError("Данные о парах не найдены в ответе API.")
-    except Exception as e:
-        print(f"Ошибка при получении данных: {e}")
-        raise
+                print(f"Трай {attempt + 1}: Успех")
+                print(address, symbol, str(market_cap))
+                return symbol, str(market_cap)
+            else:
+                print(f"Трай {attempt + 1}: Ретрай")
+                time.sleep(retry_delay)
+        except Exception as e:
+            print(f"Попытка {attempt + 1}: Ошибка при получении данных: {e}")
+            time.sleep(retry_delay)
 
-# print(fetch_token_data(WALLET_ADDRESS))
+    raise ValueError("Не удалось получить данные о парах после всех попыток.")
+
+# try:
+#     print(fetch_token_data(WALLET_ADDRESS))
+# except ValueError as e:
+#     print(f"Финальная ошибка: {e}")

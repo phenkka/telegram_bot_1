@@ -1,17 +1,18 @@
 import aiohttp
 import asyncio
 import re
-import app.config as cfg
+from app import config as cfg
 from datetime import datetime, timezone
 from db.database import Database
+import time
 
 
-db = Database(minconn=1, maxconn=10, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
+db = Database(minconn=1, maxconn=25, dbname=cfg.dbname, user=cfg.user, password=cfg.password)
 api_key = cfg.HELIUM_API
 current_timestamp = datetime.now(timezone.utc).timestamp()
 day_timestamp = 86400
 SOLANA_ADDRESS_REGEX = r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'
-sleep_interval = 1800
+sleep_interval = 60
 
 wallets = db.get_wallets()
 print(wallets)
@@ -31,6 +32,7 @@ async def fetch_wallet_transactions(wallet):
     url = f"{base_url}?api-key={api_key}"
 
     while True:
+        start_time = time.time()
         # Выполнение асинхронного запроса
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -63,25 +65,28 @@ async def fetch_wallet_transactions(wallet):
                                     db.add_transaction(description[0], description[-1], description[-2], timestamp, 'SWAP')
 
 
-                                elif operation_type == "TRANSFER" and wallet == description[-1][:-1] and description[-3] != "SOL":
-                                    existing_tokens = db.get_tokens_for_wallet(description[-1])
-                                    if (description[-3], timestamp) in existing_tokens or not has_one_decimal_place(description[2]) or float(description[2]) < 1000:
-                                        continue
-                                    print(f"Description: {description}")
-                                    print(f"Wallet: {description[-1][:-1]}")
-                                    print(f"Token: {description[-3]}")
-                                    print(f"Token_am: {description[2]}")
-                                    print(f"Time: {timestamp}")
-                                    print(f"Type: {operation_type}\n")
-                                    db.add_transaction(description[-1][:-1], description[-3], description[2], timestamp, 'TRANSFER')
+                                # elif operation_type == "TRANSFER" and wallet == description[-1][:-1] and description[-3] != "SOL":
+                                #     existing_tokens = db.get_tokens_for_wallet(description[-1])
+                                #     if (description[-3], timestamp) in existing_tokens or not has_one_decimal_place(description[2]) or float(description[2]) < 1000:
+                                #         continue
+                                #     print(f"Description: {description}")
+                                #     print(f"Wallet: {description[-1][:-1]}")
+                                #     print(f"Token: {description[-3]}")
+                                #     print(f"Token_am: {description[2]}")
+                                #     print(f"Time: {timestamp}")
+                                #     print(f"Type: {operation_type}\n")
+                                #     db.add_transaction(description[-1][:-1], description[-3], description[2], timestamp, 'TRANSFER')
+                    db.delete_old_transaction()
+                    print('удаляем старые токены')
 
                     # Ожидаем 1 минуту перед следующим запросом
+                    end_time = time.time()
+                    print(f'Времени заняло: {end_time - start_time}')
                     print(f"\nSleeping for {sleep_interval // 60} minutes...")
                     await asyncio.sleep(sleep_interval)
 
 
 async def fetch_and_parse_transactions():
-    db.delete_old_transaction()
     # Создаем задачи для всех кошельков
     tasks = [fetch_wallet_transactions(wallet) for wallet in wallets]
 
