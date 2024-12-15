@@ -284,7 +284,11 @@ class Database:
             SELECT token 
             FROM infl_buys 
             GROUP BY token 
+<<<<<<< HEAD
             HAVING COUNT(DISTINCT wallet) > 1
+=======
+            HAVING COUNT(DISTINCT wallet) > 2
+>>>>>>> d1eb9e7c7a5d0d07b2653c7619dac5814ff3cbec
         """
         result_unique_tokens: List[Tuple] = self.execute_read_many_query(get_unique_tokens_query)
         return [row[0] for row in result_unique_tokens]

@@ -1,6 +1,10 @@
 import unittest
 
+<<<<<<< HEAD
 from db.database import Database
+=======
+from db.db import Database
+>>>>>>> d1eb9e7c7a5d0d07b2653c7619dac5814ff3cbec
 
 
 def clean_db(db):
