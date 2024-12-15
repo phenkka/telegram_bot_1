@@ -1,4 +1,4 @@
-WALLET_ADDRESS = "83z64mKGwjWecJmekE696rJYAHRYEPemMox6dg4Ypump"
+WALLET_ADDRESS = "GBVaZABFUkH81F1cF3HHQkAtsz9gVE4qDaBBvfzGpump"
 
 import requests
 import time
