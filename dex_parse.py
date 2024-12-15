@@ -1,4 +1,4 @@
-WALLET_ADDRESS = "83z64mKGwjWecJmekE696rJYAHRYEPemMox6dg4Ypump"
+WALLET_ADDRESS = "GBVaZABFUkH81F1cF3HHQkAtsz9gVE4qDaBBvfzGpump"
 
 import requests
 import time
@@ -34,7 +34,7 @@ def fetch_token_data(address, max_retries=5, retry_delay=1):
 
     raise ValueError("Не удалось получить данные о парах после всех попыток.")
 
-try:
-    print(fetch_token_data(WALLET_ADDRESS))
-except ValueError as e:
-    print(f"Финальная ошибка: {e}")
+# try:
+#     print(fetch_token_data(WALLET_ADDRESS))
+# except ValueError as e:
+#     print(f"Финальная ошибка: {e}")
