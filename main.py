@@ -56,6 +56,7 @@ async def check_payment(user_id: int):
 #     return True
 
 
+
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     user_id = message.from_user.id
