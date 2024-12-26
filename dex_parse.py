@@ -50,10 +50,10 @@ def fetch_token_data(address, max_retries=5, retry_delay=1):
     raise ValueError("Failed to fetch token data after all retries.")
 
 # Пример вызова
-if __name__ == "__main__":
-    try:
-        symbol, market_cap = fetch_token_data("FaefVP4DsPrudsbhVTThVqLckaSvqj175CsMPifhib2d")
-        print(f"Token Symbol: {symbol}, Market Cap: {market_cap}")
-    except ValueError as e:
-        logging.critical(f"Final failure: {e}")
-        print(e)
+# if __name__ == "__main__":
+#     try:
+#         symbol, market_cap = fetch_token_data("FaefVP4DsPrudsbhVTThVqLckaSvqj175CsMPifhib2d")
+#         print(f"Token Symbol: {symbol}, Market Cap: {market_cap}")
+#     except ValueError as e:
+#         logging.critical(f"Final failure: {e}")
+#         print(e)
