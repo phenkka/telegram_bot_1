@@ -2,7 +2,6 @@ import requests
 import time
 import logging
 
-# Настройка логгирования
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -18,11 +17,9 @@ def fetch_token_data(address, max_retries=5, retry_delay=1):
 
             response = requests.get(url)
 
-            # Логгируем запрос
             logging.info(f"Sent GET request: {url}")
 
             if response.status_code != 200:
-                # Логгируем ошибку
                 logging.error(
                     f"HTTP Error {response.status_code}: {response.reason}. Response body: {response.text}"
                 )
