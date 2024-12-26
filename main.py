@@ -252,7 +252,7 @@ async def background_task():
                     try:
                         symbol, market_cap = fetch_token_data(token)
                     except ValueError as e:
-                        symbol, market_cap = 'unknown', 0
+                        symbol, market_cap = 'unknown', '0000'
 
                     if len(market_cap) < 7:
                         market_cap = f"{market_cap[:-3]}K"

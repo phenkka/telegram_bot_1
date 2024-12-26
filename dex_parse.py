@@ -46,7 +46,8 @@ def fetch_token_data(address, max_retries=5, retry_delay=1):
             logging.error(f"Attempt {attempt + 1}: Error while fetching data: {e}")
             time.sleep(retry_delay)
 
-    raise ValueError("Failed to fetch token data after all retries.")
+    logging.error("Failed to fetch token data. Returning default values: Symbol = 'unknown', Market Cap = '0000'")
+    return 'unknown', '0000'
 
 
 # Пример вызова
