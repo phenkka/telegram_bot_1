@@ -5,8 +5,10 @@ import logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="dexscreener.log",
-    filemode="a"
+    handlers=[
+        logging.FileHandler("dexscreener.log", mode="a"),
+        logging.StreamHandler()
+    ]
 )
 
 def fetch_token_data(address, max_retries=5, retry_delay=1):
@@ -45,6 +47,7 @@ def fetch_token_data(address, max_retries=5, retry_delay=1):
             time.sleep(retry_delay)
 
     raise ValueError("Failed to fetch token data after all retries.")
+
 
 # Пример вызова
 # if __name__ == "__main__":
