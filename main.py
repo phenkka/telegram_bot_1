@@ -113,8 +113,6 @@ async def menu(message_or_callback):
     #     return
     user_id = message_or_callback.from_user.id
     db.update_payment_status(user_id, "paid")
-    print(db.get_users_with_notifications())
-    print(f'ВОТ - {db.get_tokens_with_more_than_5_unique_wallets()}')
     if isinstance(message_or_callback, Message):
         await message_or_callback.answer("🤖 What would you like to explore next? Your turn, thinker 🧠... The choice is yours! ✨", reply_markup=kb.menu)
     elif isinstance(message_or_callback, CallbackQuery):
@@ -311,10 +309,9 @@ async def background_task():
                                     print(f"Превышено количество попыток для кошелька {wallet}.")
                                     continue
 
-                    db.add_notified_token(token)
-                    print('захожу в нотифай юзерс')
-                    print(all_count, count, counts)
-                    await notify_users(message, message_smart, message_infl, count, all_count, counts)
+                    if all_count > 2 or count > 2 or counts > 1:
+                        db.add_notified_token(token)
+                        await notify_users(message, message_smart, message_infl, count, all_count, counts)
 
             await asyncio.sleep(60)
     except Exception as e:
