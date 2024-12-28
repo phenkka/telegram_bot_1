@@ -113,8 +113,7 @@ async def menu(message_or_callback):
     #     return
     user_id = message_or_callback.from_user.id
     db.update_payment_status(user_id, "paid")
-    print(db.get_users_with_notifications())
-    print(f'ВОТ - {db.get_tokens_with_more_than_5_unique_wallets()}')
+
     if isinstance(message_or_callback, Message):
         await message_or_callback.answer("🤖 What would you like to explore next? Your turn, thinker 🧠... The choice is yours! ✨", reply_markup=kb.menu)
     elif isinstance(message_or_callback, CallbackQuery):
@@ -230,7 +229,7 @@ async def background_task():
                         raise
 
             for token in tokens:
-                count, all_count, counts = 0, 0, 0
+                infl_count, all_count, degen_count = 0, 0, 0
 
                 if not db.is_token_notified(token):
 
@@ -291,13 +290,13 @@ async def background_task():
                                     )
 
                                     if infl == 'smart_degen':
-                                        counts += 1
+                                        degen_count += 1
                                         message_smart += (
                                             f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
                                             f"<code>{wallet}</code>\n\n"
                                         )
                                     else:
-                                        count += 1
+                                        infl_count += 1
                                         message_infl += (
                                             f"{pnl_emoji} PNL: {pnl}, {wr_emoji} WR(7d): {wr}, <b><a href='{link}'>{infl}</a></b>\n"
                                             f"<code>{wallet}</code>\n\n"
@@ -311,10 +310,10 @@ async def background_task():
                                     print(f"Превышено количество попыток для кошелька {wallet}.")
                                     continue
 
-                    db.add_notified_token(token)
-                    print('захожу в нотифай юзерс')
-                    print(all_count, count, counts)
-                    await notify_users(message, message_smart, message_infl, count, all_count, counts)
+                    if all_count > 2 or infl_count > 2 or degen_count > 1:
+                        print('захожу в нотифай юзерс')
+                        db.add_notified_token(token)
+                        await notify_users(message, message_smart, message_infl, infl_count, all_count, degen_count)
 
             await asyncio.sleep(60)
     except Exception as e:
@@ -322,7 +321,7 @@ async def background_task():
         print("Произошла ошибка, будет попытка повторить выполнение через 60 секунд.")
         await asyncio.sleep(60)
 
-async def notify_users(message, message_smart, message_infl, count, all_count, counts):
+async def notify_users(message, message_smart, message_infl, infl_count, all_count, degen_count):
     users_with_notifications = db.get_users_with_notifications()
     print(users_with_notifications)
 
@@ -335,11 +334,11 @@ async def notify_users(message, message_smart, message_infl, count, all_count, c
                 await bot.send_message(user_id, message, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
-            elif notify_infl and count > 2:
+            elif notify_infl and infl_count > 2:
                 await bot.send_message(user_id, message_infl, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
-            elif notify_smart and counts > 1:
+            elif notify_smart and degen_count > 1:
                 await bot.send_message(user_id, message_smart, parse_mode='HTML', disable_web_page_preview=True)
                 continue
 
