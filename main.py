@@ -278,7 +278,10 @@ async def background_task():
                             try:
                                 result = db.get_data(wallet)
                                 if result is not None:
-                                    pnl, wr = result
+                                    try:
+                                        pnl, wr = result
+                                    except (ValueError, TypeError):
+                                        pnl, wr = 25, 30
                                     pnl_emoji = "🟢" if float(pnl.strip('%')) > 0 else "🔴"
                                     wr_emoji = "🟢" if float(wr.strip('%')) > 50 else "🔴"
                                     infl, link = db.get_influencer(wallet)
